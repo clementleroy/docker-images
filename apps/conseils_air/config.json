@@ -1,0 +1,84 @@
+{
+  "name": "Conseils Air",
+  "description": "Conseils d’aération par pièce : humidité, CO₂ et mesures fiables.",
+  "version": "1.2.0",
+  "slug": "conseils_air",
+  "arch": [
+    "amd64",
+    "aarch64"
+  ],
+  "startup": "application",
+  "boot": "auto",
+  "init": true,
+  "homeassistant_api": true,
+  "services": [
+    "mqtt:need"
+  ],
+  "watchdog": "http://[HOST]:8099/health",
+  "options": {
+    "interval_seconds": 15,
+    "source_sensor": "sensor.outdoor_source",
+    "outdoor_temperature": "sensor.outdoor_temperature",
+    "outdoor_humidity": "sensor.outdoor_humidity",
+    "weather": "weather.example",
+    "thresholds": {
+      "need_minutes": 3,
+      "correct_minutes": 5,
+      "proof_minutes": 4
+    },
+    "rooms": [
+      {
+        "key": "bureau",
+        "name": "Bureau",
+        "temperature": "sensor.bureau_temperature",
+        "humidity": "sensor.bureau_humidity",
+        "co2": "sensor.bureau_co2",
+        "contacts": [
+          "binary_sensor.bureau_window"
+        ],
+        "decision_entity": "input_select.bureau_ventilation"
+      },
+      {
+        "key": "chambre",
+        "name": "Chambre",
+        "temperature": "sensor.chambre_temperature",
+        "humidity": "sensor.chambre_humidity",
+        "co2": "sensor.chambre_co2",
+        "contacts": [
+          "binary_sensor.chambre_window"
+        ],
+        "decision_entity": "input_select.chambre_ventilation"
+      }
+    ]
+  },
+  "schema": {
+    "interval_seconds": "int(5,30)",
+    "source_sensor": "str",
+    "outdoor_temperature": "str",
+    "outdoor_humidity": "str",
+    "weather": "str",
+    "thresholds": {
+      "need_minutes": "int(1,30)",
+      "correct_minutes": "int(1,30)",
+      "proof_minutes": "int(0,30)"
+    },
+    "rooms": [
+      {
+        "key": "str",
+        "name": "str",
+        "temperature": "str",
+        "humidity": "str",
+        "co2": "str",
+        "contacts": [
+          "str"
+        ],
+        "decision_entity": "str?"
+      }
+    ]
+  },
+  "ingress": true,
+  "ingress_port": 8099,
+  "panel_icon": "mdi:air-filter",
+  "panel_title": "Conseils Air",
+  "panel_admin": true
+}

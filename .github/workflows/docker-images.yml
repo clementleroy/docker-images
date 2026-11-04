@@ -1,0 +1,109 @@
+name: Images Docker versionnées
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - .github/workflows/docker-images.yml
+      - services/frigate-video-fixes/**
+      - apps/conseils_air/**
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  packages: write
+
+concurrency:
+  group: docker-images-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: docker-images-frigate-video-fixes
+            context: services/frigate-video-fixes
+          - name: docker-images-conseils-air
+            context: apps/conseils_air
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+      - name: Déterminer la version
+        env:
+          IMAGE_NAME: ${{ matrix.name }}
+          BUILD_CONTEXT: ${{ matrix.context }}
+        run: |
+          set -euo pipefail
+          version=$(cat "$BUILD_CONTEXT/IMAGE_VERSION")
+          [[ "$version" =~ ^[0-9][a-zA-Z0-9._-]*$ ]]
+          owner=${GITHUB_REPOSITORY_OWNER,,}
+          echo "IMAGE=ghcr.io/$owner/$IMAGE_NAME" >> "$GITHUB_ENV"
+          echo "VERSION=$version" >> "$GITHUB_ENV"
+      - name: Connexion GHCR
+        env:
+          GHCR_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: printf '%s' "$GHCR_TOKEN" | docker login ghcr.io -u "$GITHUB_ACTOR" --password-stdin
+      - name: Préserver les versions déjà publiées
+        id: existing
+        run: |
+          set -euo pipefail
+          if docker manifest inspect "$IMAGE:$VERSION" >/dev/null 2>&1; then
+            echo 'skip=true' >> "$GITHUB_OUTPUT"
+            echo "Version déjà publiée : $IMAGE:$VERSION (conservée)."
+          else
+            echo 'skip=false' >> "$GITHUB_OUTPUT"
+          fi
+      - name: Construire et vérifier
+        if: steps.existing.outputs.skip != 'true'
+        env:
+          BUILD_CONTEXT: ${{ matrix.context }}
+          IMAGE_NAME: ${{ matrix.name }}
+        run: |
+          set -euo pipefail
+          docker build --pull \
+            --label "org.opencontainers.image.source=https://github.com/$GITHUB_REPOSITORY" \
+            --label "org.opencontainers.image.revision=$GITHUB_SHA" \
+            --label "org.opencontainers.image.version=$VERSION" \
+            -t "$IMAGE:$VERSION" "$BUILD_CONTEXT"
+          if [[ "$IMAGE_NAME" == docker-images-conseils-air ]]; then
+            docker run --rm --network none --entrypoint python \
+              --mount "type=bind,src=$GITHUB_WORKSPACE/$BUILD_CONTEXT,dst=/tests,readonly" \
+              -w /tests "$IMAGE:$VERSION" -m unittest discover -s /tests -p 'test_*.py'
+          else
+            docker run --rm -i --network none --entrypoint python3 \
+              "$IMAGE:$VERSION" - < "$BUILD_CONTEXT/check_nginx_runtime.py"
+          fi
+      - name: Publier
+        if: steps.existing.outputs.skip != 'true'
+        run: |
+          set -euo pipefail
+          docker push "$IMAGE:$VERSION"
+          docker tag "$IMAGE:$VERSION" "$IMAGE:sha-$GITHUB_SHA"
+          docker push "$IMAGE:sha-$GITHUB_SHA"
+      - name: Vérifier et documenter la publication
+        env:
+          GHCR_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          IMAGE_NAME: ${{ matrix.name }}
+        run: |
+          set -euo pipefail
+          docker manifest inspect "$IMAGE:$VERSION" >/dev/null
+          package=$(curl --fail --silent --show-error \
+            -H "Authorization: Bearer $GHCR_TOKEN" \
+            -H 'Accept: application/vnd.github+json' \
+            "https://api.github.com/users/$GITHUB_REPOSITORY_OWNER/packages/container/$IMAGE_NAME")
+          visibility=$(jq -er '.visibility' <<< "$package")
+          {
+            echo "### $IMAGE:$VERSION"
+            echo "Visibilité GitHub : $visibility"
+            echo "$(jq -r '.html_url' <<< "$package")"
+            echo 'Les nouveaux packages GHCR sont privés par défaut. Pour le téléchargement anonyme, sélectionner Public dans Package settings → Change visibility.'
+          } >> "$GITHUB_STEP_SUMMARY"
+      - name: Fermer la connexion
+        if: always()
+        run: docker logout ghcr.io
