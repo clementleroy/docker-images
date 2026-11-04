@@ -20,10 +20,11 @@ Augmenter `IMAGE_VERSION` dans le dossier concerné après une modification, pui
 committer et pousser. Un tag existant est conservé. Les nouveaux tags de version
 sont accompagnés d’un tag `sha-<commit complet>` ; aucun tag `latest`.
 
-GitHub crée les nouveaux packages GHCR en privé par défaut, même si les sources
-sont publiques. Après le premier push, passer chaque package en Public dans
-**Package settings → Change visibility**, puis vérifier le téléchargement anonyme.
-Le workflow affiche la visibilité réellement retournée par GitHub.
+Le workflow affiche la visibilité réellement retournée par GitHub. Vérifier le
+téléchargement anonyme après publication : l'accès aux packages se règle séparément
+de celui des sources. Si un package reste privé, sélectionner Public dans
+**Package settings → Change visibility**. La première image Conseils Air publiée
+par ce dépôt est accessible anonymement sans changement manuel.
 
 ## Utiliser dans Compose
 
