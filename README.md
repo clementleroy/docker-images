@@ -5,40 +5,26 @@ Les exemples utilisent des identifiants fictifs ; aucun historique du dépôt pr
 
 | Image | Version | Rôle |
 | --- | --- | --- |
-| `ghcr.io/clementleroy/docker-images-frigate-video-fixes` | `0.18.2-20261101` | Correctifs miniatures et nginx pour Frigate |
 | `ghcr.io/clementleroy/docker-images-conseils-air` | `1.2.0` | Conseils d’aération, application Home Assistant conservée |
 
 ## Construire et publier
 
-Le workflow GitHub Actions construit sur `main` ou par lancement manuel depuis `main`.
-Il teste les sources Frigate natives et six scénarios nginx dans un conteneur sans
-réseau, puis les 33 tests Conseils Air. Les images initiales ciblent `linux/amd64`.
-La base Frigate est épinglée par digest ; les empreintes des fichiers sont vérifiées
-avant modification. Les contextes Docker ne copient aucune donnée de fonctionnement.
+Le workflow GitHub Actions construit sur `main` ou par lancement manuel depuis
+`main`. Les versions déjà publiées sont conservées, sans reconstruction.
+Il exécute les 33 tests Conseils Air dans un conteneur sans réseau. L’image cible
+`linux/amd64`. Les contextes Docker ne copient aucune donnée de fonctionnement.
 
-Augmenter `IMAGE_VERSION` dans le dossier concerné après une modification, puis
+Augmenter `IMAGE_VERSION` dans `apps/conseils_air` après une modification, puis
 committer et pousser. Un tag existant est conservé. Les nouveaux tags de version
 sont accompagnés d’un tag `sha-<commit complet>` ; aucun tag `latest`.
 
 Le workflow affiche la visibilité réellement retournée par GitHub. Vérifier le
 téléchargement anonyme après publication : l'accès aux packages se règle séparément
 de celui des sources. Si un package reste privé, sélectionner Public dans
-**Package settings → Change visibility**. La première image Conseils Air publiée
-par ce dépôt est accessible anonymement sans changement manuel.
+**Package settings → Change visibility**. L’image Conseils Air publiée par ce dépôt
+est accessible anonymement sans changement manuel.
 
 ## Utiliser dans Compose
-
-Après publication et vérification du téléchargement, remplacer uniquement l’image
-du service Frigate dans son Compose existant :
-
-```yaml
-services:
-  frigate:
-    image: ghcr.io/clementleroy/docker-images-frigate-video-fixes:0.18.2-20261101
-```
-
-Conserver les autres réglages, volumes, ports et services. Valider le Compose avant
-une mise à jour ciblée. Une ancienne version reste disponible pour retour arrière.
 
 Conseils Air dépend des API du Supervisor Home Assistant et du service MQTT ; son
 image ne constitue pas une application Compose autonome. `config.json` contient
@@ -47,13 +33,7 @@ n’est pas activée par la publication de ce dépôt.
 
 ## Développer
 
-Les tests Frigate sont exécutés au build contre les sources de la base exacte.
-Sur une nouvelle base, revoir les empreintes et les tests avant de changer le digest.
-
 ```sh
-docker build -t frigate-video-fixes services/frigate-video-fixes
-docker run --rm -i --network none --entrypoint python3 frigate-video-fixes - \
-  < services/frigate-video-fixes/check_nginx_runtime.py
 docker build -t conseils-air apps/conseils_air
 docker run --rm --network none --entrypoint python \
   --mount "type=bind,src=$PWD/apps/conseils_air,dst=/tests,readonly" \

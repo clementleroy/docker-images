@@ -5,7 +5,6 @@ on:
     branches: [main]
     paths:
       - .github/workflows/docker-images.yml
-      - services/frigate-video-fixes/**
       - apps/conseils_air/**
   workflow_dispatch:
 
@@ -26,8 +25,6 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - name: docker-images-frigate-video-fixes
-            context: services/frigate-video-fixes
           - name: docker-images-conseils-air
             context: apps/conseils_air
     steps:
@@ -71,14 +68,9 @@ jobs:
             --label "org.opencontainers.image.revision=$GITHUB_SHA" \
             --label "org.opencontainers.image.version=$VERSION" \
             -t "$IMAGE:$VERSION" "$BUILD_CONTEXT"
-          if [[ "$IMAGE_NAME" == docker-images-conseils-air ]]; then
-            docker run --rm --network none --entrypoint python \
-              --mount "type=bind,src=$GITHUB_WORKSPACE/$BUILD_CONTEXT,dst=/tests,readonly" \
-              -w /tests "$IMAGE:$VERSION" -m unittest discover -s /tests -p 'test_*.py'
-          else
-            docker run --rm -i --network none --entrypoint python3 \
-              "$IMAGE:$VERSION" - < "$BUILD_CONTEXT/check_nginx_runtime.py"
-          fi
+          docker run --rm --network none --entrypoint python \
+            --mount "type=bind,src=$GITHUB_WORKSPACE/$BUILD_CONTEXT,dst=/tests,readonly" \
+            -w /tests "$IMAGE:$VERSION" -m unittest discover -s /tests -p 'test_*.py'
       - name: Publier
         if: steps.existing.outputs.skip != 'true'
         run: |
